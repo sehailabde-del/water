@@ -71,6 +71,8 @@ td input{width:90px;padding:5px}
 <label style="max-width:220px;margin-bottom:10px">الاشتراك الشهري (درهم)<input id="fee" type="number" min="0" step="any" value="0"></label>
 <div id="tiers"></div>
 <button id="addT" type="button" style="margin-top:4px">+ إضافة شريحة</button>
+<div class="tr" style="margin-top:14px;align-items:end"><label style="max-width:170px">شهر للإقفال<input id="cm" type="month"></label><button id="cmb" type="button">إقفال الشهر</button></div>
+<div id="zl" class="note"></div>
 <p class="note">يُحسب كل جزء من استهلاك العداد بسعر الشريحة التي يقع فيها (بالمتر المكعب). الشريحة الأخيرة مفتوحة لما فوق.</p>
 </div>
 
@@ -80,13 +82,18 @@ td input{width:90px;padding:5px}
 <label>تاريخ القراءة<input id="rDate" type="date"></label>
 
 <label>بحث<input id="q" placeholder="اسم أو رقم العداد"></label>
+<label style="max-width:110px">سنة الكشف<input id="yr" type="number" min="2000" max="2100"></label>
 <button id="saveR">حفظ القراءات</button>
 <button id="allInv" style="background:var(--bd);color:var(--tx)">فواتير كل العدادات</button>
 <button id="rep" style="background:var(--bd);color:var(--tx)">كشف الشهر</button>
+<button id="repY" style="background:var(--bd);color:var(--tx)">كشف السنة</button>
+<button id="repA" style="background:var(--bd);color:var(--tx)">المتأخرات</button>
+<button id="xl" style="background:var(--bd);color:var(--tx)">تصدير Excel</button>
 </div>
 <div class="sc"><table>
-<thead><tr><th>رقم العداد</th><th>المستهلك</th><th>القراءة السابقة</th><th>القراءة الجديدة</th><th>الاستهلاك (م³)</th><th>التكلفة (درهم)</th><th></th><th></th><th></th></tr></thead>
+<thead><tr><th>رقم العداد</th><th>المستهلك</th><th>القراءة السابقة</th><th>القراءة الحالية</th><th>الاستهلاك (م³)</th><th>التكلفة (درهم)</th><th>الدفع</th><th></th><th></th><th></th></tr></thead>
 <tbody id="tb"></tbody></table></div>
+<button id="saveR2" style="margin-top:10px;width:100%">حفظ القراءات</button>
 <p class="note">الاستهلاك = آخر قراءة − القراءة التي قبلها. تُلوَّن بالأحمر العدادات التي يتجاوز استهلاكها ضعف المتوسط (احتمال تسرب). تُحفظ البيانات في هذا المتصفح فقط.</p>
 </div>
 
@@ -103,10 +110,10 @@ function save(){if(!DB){try{localStorage.setItem(KEY,JSON.stringify(M))}catch(e)
 function note(s){var e=document.getElementById("nt");e.textContent=s;e.style.display=s?"block":"none"}
 function mg(){try{return localStorage.getItem(KEY+"-mig")}catch(e){return "1"}}
 function addMeter(o){o.id="m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);o.t=Date.now()*1000+(SEQ++);M.push(o);wr(o)}
-function wr(m){if(!DB){save();return}DB.collection("meters").doc(m.id).set({n:m.n||"",no:m.no||"",t:m.t||0,r:m.r}).catch(function(){note("تعذّر الحفظ: قد لا تملك صلاحية الكتابة")})}
+function wr(m){if(!DB){save();return}DB.collection("meters").doc(m.id).set({n:m.n||"",no:m.no||"",t:m.t||0,r:m.r,p:m.p||{}}).catch(function(){note("تعذّر الحفظ: قد لا تملك صلاحية الكتابة")})}
 function rm(m){if(!DB){save();return}if(m&&m.id)DB.collection("meters").doc(m.id).delete().catch(function(){})}
 var swT=null;
-function sw(){if(!DB)return;clearTimeout(swT);swT=setTimeout(function(){DB.doc("settings/cfg").set({T:T,F:F}).catch(function(){})},700)}
+function sw(){if(!DB)return;clearTimeout(swT);swT=setTimeout(function(){DB.doc("settings/cfg").set({T:T,F:F,Z:Z}).catch(function(){})},700)}
 function migrate(){try{localStorage.setItem(KEY+"-mig","1")}catch(e){}
 try{JSON.parse(localStorage.getItem(KEY)||"[]").forEach(function(o){addMeter(o)})}catch(e){}
 sw()}
@@ -117,9 +124,23 @@ if(s.empty&&ed&&!mg()&&!(s.metadata&&s.metadata.fromCache)){migrate();return}
 M=s.docs.map(function(d){var x=d.data();x.id=d.id;return x}).sort(function(a,b){return (a.t||0)-(b.t||0)});
 var a=document.activeElement;if(a&&a.closest&&a.closest("#tb")){PEND=1;return}
 render()},function(){note("تعذّرت قراءة البيانات المشتركة")});
-DB.doc("settings/cfg").onSnapshot(function(s){if(!s.exists)return;var a=document.activeElement;if(a&&(a.id==="fee"||(a.closest&&a.closest("#tiers"))))return;var x=s.data();if(x.T&&x.T.length)T=x.T;F=+x.F||0;document.getElementById("fee").value=F;drawT();render()})}
+DB.doc("settings/cfg").onSnapshot(function(s){if(!s.exists)return;var a=document.activeElement;if(a&&(a.id==="fee"||(a.closest&&a.closest("#tiers"))))return;var x=s.data();if(x.T&&x.T.length)T=x.T;F=+x.F||0;Z=x.Z||{};document.getElementById("fee").value=F;drawT();drawZ();render()})}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-function cons(m){var r=m.r,n=r.length;return n<2?0:r[n-1].v-r[n-2].v}
+/*H1*/
+function ym(d){return (d||"").slice(0,7)}
+function lkey(m){var n=m.r.length;return n>1?ym(m.r[n-1].d):""}
+function mcons(m,q){var s=0;m.r.forEach(function(r,k){if(k>0&&!r.b&&ym(r.d)===q)s+=r.v-m.r[k-1].v});return s}
+function cons(m){var q=lkey(m);return q?mcons(m,q):0}
+function mlist(m){var o=[];m.r.forEach(function(r,k){var q=ym(r.d);if(k>0&&q&&o.indexOf(q)<0)o.push(q)});return o}
+function mi(m,dt){var ci=-1,q=ym(dt);m.r.forEach(function(x,k){if(k>0&&!x.x&&ym(x.d)===q)ci=k});return ci}
+function bill(m){var q=lkey(m);return q?cost(Math.max(0,cons(m)),q):0}
+function arr(m){var cu=lkey(m),s=0,l=[];mlist(m).forEach(function(q){if(q<cu&&!(m.p&&m.p[q])){s+=cost(Math.max(0,mcons(m,q)),q);l.push(q)}});return{s:s,l:l}}
+function chk(m,x){if(isNaN(x))return"";var dt=document.getElementById("rDate").value,q=ym(dt),ci=mi(m,dt),b=ci>0?m.r[ci-1].v:last(m);
+if(x<b)return"أقل من القراءة السابقة ("+fmt(b)+")";
+var d=x-b,s=0,n=0;m.r.forEach(function(r,k){if(k>0&&!r.b&&ym(r.d)!==q){s+=r.v-m.r[k-1].v;n++}});
+if(n&&s>0&&d>3*(s/n)&&d>10)return"استهلاك مرتفع جدًا ("+fmt(d)+" م³) مقارنة بالمعتاد ("+fmt(s/n)+")";return""}
+function toast(t){var e=document.getElementById("toast");e.textContent=t;e.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(function(){e.style.display="none"},3200)}
+/*H2*/
 function last(m){return m.r.length?m.r[m.r.length-1].v:0}
 function prev(m){return m.r.length>1?m.r[m.r.length-2].v:(m.r.length?m.r[0].v:0)}
 function fmt(n){return (Math.round(n*100)/100).toLocaleString("en-US")}
@@ -136,14 +157,14 @@ document.getElementById("sC").textContent=fmt(totCost());
 var h="";
 M.forEach(function(m,i){
 
-if(Q&&(m.n+" "+(m.no||"")).toLowerCase().indexOf(Q)<0)return;var c=cons(m),hi=avg>0&&c>2*avg&&c>0,w=mx>0?Math.max(0,c)/mx*100:0;
-h+='<tr class="'+(hi?"hi":"")+'"><td><input data-no="'+i+'" value="'+esc(m.no||"")+'" style="width:80px"></td><td><input data-nm="'+i+'" value="'+esc(m.n)+'" style="width:140px"></td><td>'+fmt(last(m))+'</td>'
-+'<td><input type="number" min="0" step="any" data-i="'+i+'" value="'+(RV[m.id]||"")+'"></td>'
-+'<td>'+(c<0?"⚠ "+fmt(c):fmt(c))+'</td><td data-c="'+i+'">'+fmt(cost(Math.max(0,c)))+'</td>'
+if(Q&&(m.n+" "+(m.no||"")).toLowerCase().indexOf(Q)<0)return;var dt=document.getElementById("rDate").value,ci=mi(m,dt);var cu=ci>0?m.r[ci]:null,bl=cu?m.r[ci-1].v:last(m),pd=isPaid(m);var c=cons(m),hi=avg>0&&c>2*avg&&c>0,w=mx>0?Math.max(0,c)/mx*100:0;
+h+='<tr class="'+(hi?"hi":"")+'"><td><input data-no="'+i+'" value="'+esc(m.no||"")+'" style="width:80px"></td><td><input data-nm="'+i+'" value="'+esc(m.n)+'" style="width:140px"></td><td>'+fmt(bl)+'</td>'
++'<td><input type="number" min="0" step="any" data-i="'+i+'" value="'+(RV[m.id]!==undefined?RV[m.id]:(cu?cu.v:""))+'">'+(cu?'<span style="color:#1a9b5a;font-weight:700"> ✓</span>':'')+'</td>'
++'<td>'+(c<0?"⚠ "+fmt(c):fmt(c))+'</td><td data-c="'+i+'">'+fmt(bill(m))+'</td><td>'+(m.r.length>1?'<button class="g" data-pay="'+i+'" style="'+(pd?'background:#1a9b5a;color:#fff;border-color:#1a9b5a':'color:var(--bad)')+'">'+(pd?'✓ مدفوع':'غير مدفوع')+'</button>':'—')+'</td>'
 +'<td><div class="bar"><i style="width:'+w+'%"></i></div></td>'
-+'<td><button class="g" style="color:var(--ac)" data-v="'+i+'">فاتورة</button></td><td><button class="g" data-d="'+i+'">حذف</button></td></tr>';
++'<td><button class="g" style="color:var(--ac)" data-v="'+i+'">فاتورة</button> <button class="g" data-rp="'+i+'" title="استبدال العداد">⟲</button></td><td><button class="g" data-d="'+i+'">حذف</button></td></tr>';
 });
-document.getElementById("tb").innerHTML=h||'<tr><td colspan="9">لا توجد عدادات بعد. أضف أول عدّاد من الأعلى.</td></tr>';
+document.getElementById("tb").innerHTML=h||'<tr><td colspan="10">لا توجد عدادات بعد. أضف أول عدّاد من الأعلى.</td></tr>';
 }
 document.getElementById("rDate").value=new Date().toISOString().slice(0,10);
 document.getElementById("addM").onclick=function(){
@@ -154,43 +175,81 @@ document.getElementById("mName").value="";document.getElementById("mNo").value="
 };
 document.getElementById("saveR").onclick=function(){
 var d=document.getElementById("rDate").value;
-M.forEach(function(m){var v=RV[m.id];if(v!==undefined&&v!==""){m.r.push({d:d,v:parseFloat(v)});wr(m)}});RV={};
+var ns=0,bad=[];
+if(Z[ym(d)]){toast("🔒 هذا الشهر مقفل ولا يمكن تعديل قراءاته");return}
+M.forEach(function(m){var v=RV[m.id];if(v===undefined||v===""||isNaN(parseFloat(v)))return;var w=chk(m,parseFloat(v));if(w)bad.push((m.no||m.n)+": "+w)});
+if(bad.length&&!confirm("تنبيه، قراءات تحتاج مراجعة:\n"+bad.join("\n")+"\n\nهل تريد الحفظ رغم ذلك؟"))return;
+M.forEach(function(m){var v=RV[m.id];if(v===undefined||v===""||isNaN(parseFloat(v)))return;var x=parseFloat(v),ci=mi(m,d);if(ci>0){m.r[ci].v=x;m.r[ci].d=d}else m.r.push({d:d,v:x});wr(m);ns++});RV={};toast(ns?"✓ تم حفظ "+ns+" قراءة":"لا توجد قراءات جديدة للحفظ");
 save();render();
 };
 document.getElementById("tb").onclick=function(e){
-var i=e.target.dataset&&e.target.dataset.d;if(e.target.dataset&&e.target.dataset.v!==undefined){showInv([+e.target.dataset.v]);return}
+var i=e.target.dataset&&e.target.dataset.d;if(e.target.dataset&&e.target.dataset.v!==undefined){showInv([+e.target.dataset.v]);return}if(e.target.dataset&&e.target.dataset.pay!==undefined){togglePay(M[+e.target.dataset.pay]);render();return}if(e.target.dataset&&e.target.dataset.rp!==undefined){replMeter(M[+e.target.dataset.rp]);return}
 if(i!==undefined&&i!==""){var b=e.target;if(b.dataset.s){var dm=M.splice(+i,1)[0];rm(dm);delete RV[dm.id];render()}else{b.dataset.s="1";b.textContent="اضغط للتأكيد";setTimeout(function(){b.dataset.s="";b.textContent="حذف"},3000)}}
 };
-var F=0,Q="",RV={},DB=null,US=null,SEQ=0,PEND=0;
-function brk(c){var o=[],lo=0;for(var i=0;i<T.length&&c>lo;i++){var hi=T[i].u==null?Infinity:T[i].u,q=Math.min(c,hi)-lo;if(q>0)o.push({a:lo,b:hi,q:q,p:T[i].p});lo=hi}return o}
-function invHtml(m){var n=m.r.length,c=Math.max(0,cons(m)),cur=m.r[n-1]||{d:"",v:0},pv=n>1?m.r[n-2]:cur,rows="",tot=F;
-brk(c).forEach(function(x){var a=x.q*x.p;tot+=a;rows+='<tr><td>'+fmt(x.a)+' – '+(x.b===Infinity?'∞':fmt(x.b))+'</td><td>'+fmt(x.q)+'</td><td>'+fmt(x.p)+'</td><td>'+fmt(a)+'</td></tr>'});
+var F=0,Q="",RV={},DB=null,US=null,SEQ=0,PEND=0,Z={};
+function isPaid(m){var n=m.r.length;if(n<2)return false;var k=(m.r[n-1].d||"").slice(0,7);return !!(m.p&&m.p[k])}
+function togglePay(m){var n=m.r.length;if(n<2)return;var k=(m.r[n-1].d||"").slice(0,7);m.p=m.p||{};if(m.p[k])delete m.p[k];else m.p[k]=new Date().toISOString().slice(0,10);wr(m)}
+function brk(c,key){var z=key&&Z[key],TT=z?z.T:T,o=[],lo=0;for(var i=0;i<TT.length&&c>lo;i++){var hi=TT[i].u==null?Infinity:TT[i].u,q=Math.min(c,hi)-lo;if(q>0)o.push({a:lo,b:hi,q:q,p:TT[i].p});lo=hi}return o}
+function invHtml(m){var n=m.r.length,q=lkey(m),c=Math.max(0,cons(m)),fi=-1;
+m.r.forEach(function(r,k){if(fi<0&&k>0&&ym(r.d)===q)fi=k});
+var cur=m.r[n-1]||{d:"",v:0},pv=fi>0?m.r[fi-1]:cur,rows="",z=Z[q],f=z?z.F:F,tot=f,hasb=m.r.some(function(r){return r.b&&ym(r.d)===q});
+brk(c,q).forEach(function(x){var a=x.q*x.p;tot+=a;rows+='<tr><td>'+fmt(x.a)+' – '+(x.b===Infinity?'∞':fmt(x.b))+'</td><td>'+fmt(x.q)+'</td><td>'+fmt(x.p)+'</td><td>'+fmt(a)+'</td></tr>'});
 if(!rows)rows='<tr><td colspan="4">لا يوجد استهلاك</td></tr>';
-rows+=F?'<tr><td colspan="3">الاشتراك الشهري</td><td>'+fmt(F)+'</td></tr>':'';
-var hd=(ORG.logo||ORG.name)?'<div class="ih">'+(ORG.logo?'<img src="'+esc(ORG.logo)+'" alt="">':'')+'<div><b>'+esc(ORG.name)+'</b><br><small>'+esc(ORG.fr||"")+'</small></div></div>':'';
-return '<div class="inv">'+hd+'<h3>فاتورة استهلاك المياه</h3>'
+rows+=f?'<tr><td colspan="3">الاشتراك الشهري</td><td>'+fmt(f)+'</td></tr>':'';
+var ar=arr(m);if(ar.s>0){tot+=ar.s;rows+='<tr><td colspan="3">متأخرات سابقة ('+ar.l.join(" ، ")+')</td><td>'+fmt(ar.s)+'</td></tr>'}
+return '<div class="inv">'+hdr()+'<h3>فاتورة استهلاك المياه</h3>'
 +'<table><tr><th>اسم المستهلك</th><td>'+esc(m.n)+'</td><th>رقم العداد</th><td>'+esc(m.no||"—")+'</td></tr>'
 +'<tr><th>القراءة السابقة</th><td>'+fmt(pv.v)+' ('+esc(pv.d)+')</td><th>القراءة الحالية</th><td>'+fmt(cur.v)+' ('+esc(cur.d)+')</td></tr>'
-+'<tr><th>الاستهلاك</th><td colspan="3">'+fmt(c)+' م³</td></tr></table>'
++'<tr><th>الاستهلاك</th><td colspan="3">'+fmt(c)+' م³'+(hasb?' (استُبدل العداد خلال هذه الفترة)':'')+'</td></tr><tr><th>حالة الدفع</th><td colspan="3">'+(isPaid(m)?"✓ مدفوع":"غير مدفوع")+'</td></tr></table>'
 +'<table style="margin-top:10px"><tr><th>الشريحة (م³)</th><th>الكمية (م³)</th><th>السعر (درهم)</th><th>المبلغ (درهم)</th></tr>'+rows
 +'<tr class="tot"><td colspan="3">المجموع المستحق</td><td>'+fmt(tot)+' درهم</td></tr></table></div>'}
 function printInv(){var h=document.getElementById("inv").innerHTML,w=null;
 try{w=window.open("","_blank")}catch(e){}
 if(w){var css='body{font-family:system-ui,Tahoma,sans-serif;margin:0;padding:12px}.inv{padding:16px;font-size:14px;page-break-after:always}.inv h3{text-align:center;margin:0 0 10px}.ih{display:flex;align-items:center;gap:12px;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:12px}.ih img{height:72px}.inv table{width:100%;border-collapse:collapse}.inv th,.inv td{border:1px solid #999;padding:5px;text-align:start}.inv th{background:#f0f0f0}.tot td{font-weight:700;background:#eee}';
-w.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الفواتير</title><style>'+css+'</style></head><body>'+h+'</body></html>');w.document.close();setTimeout(function(){w.focus();w.print()},400);return}
+w.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الفواتير</title><style>'+css+(h.indexOf("inv yr")>=0?"@page{size:A4 landscape;margin:10mm}":"")+'</style></head><body>'+h+'</body></html>');w.document.close();setTimeout(function(){w.focus();w.print()},400);return}
 try{window.print()}catch(e){}}
 function hdr(){return (ORG.logo||ORG.name)?'<div class="ih">'+(ORG.logo?'<img src="'+esc(ORG.logo)+'" alt="">':'')+'<div><b>'+esc(ORG.name)+'</b><br><small>'+esc(ORG.fr||"")+'</small></div></div>':''}
-function showRep(){var tot=0,amt=0,rows="";
-M.forEach(function(m,i){var c=Math.max(0,cons(m)),a=cost(c);tot+=c;amt+=a;rows+='<tr><td>'+(i+1)+'</td><td>'+esc(m.no||"—")+'</td><td>'+esc(m.n)+'</td><td>'+fmt(c)+'</td><td>'+fmt(a)+'</td></tr>'});
-document.getElementById("inv").innerHTML='<div class="inv">'+hdr()+'<h3>كشف استهلاك الشهر</h3><p>تاريخ الكشف: '+esc(document.getElementById("rDate").value)+' — عدد العدادات: '+fmt(M.length)+'</p><table><tr><th>#</th><th>رقم العداد</th><th>المستهلك</th><th>الاستهلاك (م³)</th><th>المبلغ (درهم)</th></tr>'+rows+'<tr class="tot"><td colspan="3">المجموع</td><td>'+fmt(tot)+'</td><td>'+fmt(amt)+' درهم</td></tr></table></div>';
-var c=document.getElementById("invc");c.style.display="block";c.scrollIntoView()}
+function showCard(){var cd=document.getElementById("invc");cd.style.display="block";cd.scrollIntoView()}
+function showRep(){var tot=0,amt=0,col=0,ars=0,rows="";
+M.forEach(function(m,i){var c=Math.max(0,cons(m)),a=bill(m),pd=isPaid(m),ar=arr(m).s;tot+=c;amt+=a;ars+=ar;if(pd)col+=a;
+rows+='<tr><td>'+(i+1)+'</td><td>'+esc(m.no||"—")+'</td><td>'+esc(m.n)+'</td><td>'+fmt(c)+'</td><td>'+fmt(a)+'</td><td>'+(ar?fmt(ar):"—")+'</td><td>'+(pd?"✓ مدفوع":(m.r.length>1?"غير مدفوع":"—"))+'</td></tr>'});
+document.getElementById("inv").innerHTML='<div class="inv">'+hdr()+'<h3>كشف استهلاك الشهر</h3><p>تاريخ الكشف: '+esc(document.getElementById("rDate").value)+' — عدد العدادات: '+fmt(M.length)+'</p><table><tr><th>#</th><th>رقم العداد</th><th>المستهلك</th><th>الاستهلاك (م³)</th><th>المبلغ (درهم)</th><th>متأخرات (درهم)</th><th>الدفع</th></tr>'+rows+'<tr class="tot"><td colspan="3">المجموع</td><td>'+fmt(tot)+'</td><td>'+fmt(amt)+'</td><td>'+fmt(ars)+'</td><td></td></tr></table><table style="margin-top:10px"><tr class="tot"><td>المبلغ المستحق (فواتير هذه الدورة)</td><td>'+fmt(amt)+' درهم</td></tr><tr class="tot"><td>المحصَّل (المدفوع)</td><td>'+fmt(col)+' درهم</td></tr><tr class="tot"><td>المتبقي من هذه الدورة</td><td>'+fmt(amt-col)+' درهم</td></tr><tr class="tot"><td>إجمالي المتأخرات السابقة</td><td>'+fmt(ars)+' درهم</td></tr></table></div>';
+showCard()}
+function showArr(){var rows="",tot=0;
+M.forEach(function(m){var a=arr(m);if(a.s>0){tot+=a.s;rows+='<tr><td>'+esc(m.no||"—")+'</td><td>'+esc(m.n)+'</td><td>'+a.l.join(" ، ")+'</td><td>'+fmt(a.s)+'</td></tr>'}});
+document.getElementById("inv").innerHTML='<div class="inv">'+hdr()+'<h3>قائمة المتأخرات</h3><table><tr><th>رقم العداد</th><th>المستهلك</th><th>الأشهر غير المدفوعة</th><th>المبلغ (درهم)</th></tr>'+(rows||'<tr><td colspan="4">لا توجد متأخرات</td></tr>')+'<tr class="tot"><td colspan="3">إجمالي المتأخرات</td><td>'+fmt(tot)+' درهم</td></tr></table></div>';
+showCard()}
+function showYear(){var y=String(document.getElementById("yr").value||"").trim()||String(new Date().getFullYear()),mt=[],ma=[],mp=[],tot=0,amt=0,col=0,rows="",hd="",i;
+for(i=0;i<12;i++){mt[i]=0;ma[i]=0;mp[i]=0;hd+='<th>'+(i+1)+'</th>'}
+M.forEach(function(m,n){var cm=[],ty=0,ay=0,cells="",j,key;for(j=0;j<12;j++)cm[j]=null;
+m.r.forEach(function(r,k){if(k<1||!r.d||r.d.slice(0,4)!==y)return;var mo=+r.d.slice(5,7)-1;if(mo<0||mo>11)return;cm[mo]=(cm[mo]||0)+(r.b?0:r.v-m.r[k-1].v)});
+for(j=0;j<12;j++){var c=cm[j];if(c===null){cells+='<td>—</td>';continue}c=Math.max(0,c);key=y+"-"+("0"+(j+1)).slice(-2);var a=cost(c,key);ty+=c;ay+=a;mt[j]+=c;ma[j]+=a;if(m.p&&m.p[key]){mp[j]+=a;col+=a}cells+='<td>'+fmt(c)+'</td>'}
+tot+=ty;amt+=ay;rows+='<tr><td>'+(n+1)+'</td><td>'+esc(m.no||"—")+'</td><td>'+esc(m.n)+'</td>'+cells+'<td>'+fmt(ty)+'</td><td>'+fmt(ay)+'</td></tr>'});
+var r1="",r2="",r3="";for(i=0;i<12;i++){r1+='<td>'+fmt(mt[i])+'</td>';r2+='<td>'+fmt(ma[i])+'</td>';r3+='<td>'+fmt(mp[i])+'</td>'}
+document.getElementById("inv").innerHTML='<div class="inv yr">'+hdr()+'<h3>كشف استهلاك سنة '+esc(y)+'</h3><div style="overflow-x:auto"><table style="font-size:.7rem"><tr><th>#</th><th>رقم العداد</th><th>المستهلك</th>'+hd+'<th>المجموع (م³)</th><th>المبلغ (درهم)</th></tr>'+rows+'<tr class="tot"><td colspan="3">مجموع الاستهلاك (م³)</td>'+r1+'<td>'+fmt(tot)+'</td><td></td></tr><tr class="tot"><td colspan="3">مجموع المبالغ (درهم)</td>'+r2+'<td></td><td>'+fmt(amt)+'</td></tr><tr class="tot"><td colspan="3">المحصَّل (المدفوع) (درهم)</td>'+r3+'<td></td><td>'+fmt(col)+'</td></tr></table></div><p style="font-size:.75rem">أرقام الأعمدة هي أشهر السنة (1 = يناير ... 12 = دجنبر). الشرطة تعني عدم وجود قراءة في ذلك الشهر.</p></div>';
+showCard()}
+function replMeter(m){var d=document.getElementById("rDate").value;if(Z[ym(d)]){toast("🔒 هذا الشهر مقفل");return}
+var o=prompt("استبدال العداد ("+(m.no||m.n)+")\nقراءة العداد القديم الأخيرة (اتركها فارغة إن لم تعرفها):");if(o===null)return;
+var s=prompt("قراءة العداد الجديد عند التركيب:","0");if(s===null)return;
+var ov=parseFloat(o),sv=parseFloat(s)||0;
+if(!isNaN(ov)){if(ov<last(m)){toast("قراءة العداد القديم أقل من السابقة");return}m.r.push({d:d,v:ov,x:1})}
+m.r.push({d:d,v:sv,b:1,x:1});wr(m);render();toast("✓ تم استبدال العداد")}
+function drawZ(){var h="";Object.keys(Z).sort().forEach(function(q){h+='<div class="tr"><span>🔒 '+q+'</span><button class="g" data-uz="'+q+'">إلغاء الإقفال</button></div>'});document.getElementById("zl").innerHTML=h||"لا توجد أشهر مقفلة. الإقفال يثبّت الأسعار ويمنع تعديل قراءات ذلك الشهر."}
+function loadX(cb){if(window.XLSX)return cb();var e=document.createElement("script");e.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";e.onload=function(){cb()};e.onerror=function(){cb(1)};document.head.appendChild(e)}
+function csvOut(rows,name){var t="\ufeff"+rows.map(function(r){return r.map(function(x){return '"'+String(x).replace(/"/g,'""')+'"'}).join(",")}).join("\n"),u=URL.createObjectURL(new Blob([t],{type:"text/csv"})),l=document.createElement("a");l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove()}
+function expX(){var a=[["رقم العداد","المستهلك","الاستهلاك (م³)","الفاتورة الحالية (درهم)","الدفع","المتأخرات (درهم)"]],b=[["رقم العداد","المستهلك","التاريخ","القراءة","ملاحظة"]],c=[["رقم العداد","المستهلك","الشهر","تاريخ الدفع"]];
+M.forEach(function(m){a.push([m.no||"",m.n,cons(m),bill(m),isPaid(m)?"مدفوع":(m.r.length>1?"غير مدفوع":""),arr(m).s]);m.r.forEach(function(r){b.push([m.no||"",m.n,r.d,r.v,r.b?"عداد جديد":(r.x?"قراءة العداد القديم":"")])});Object.keys(m.p||{}).sort().forEach(function(q){c.push([m.no||"",m.n,q,m.p[q]])})});
+loadX(function(err){var d=new Date().toISOString().slice(0,10);
+if(err||!window.XLSX){csvOut(b,"water-readings-"+d+".csv");toast("تعذّر تحميل مكتبة Excel فنُزّل ملف CSV للقراءات");return}
+var wb=XLSX.utils.book_new();[["العدادات",a],["القراءات",b],["المدفوعات",c]].forEach(function(t){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(t[1]),t[0])});
+XLSX.writeFile(wb,"water-backup-"+d+".xlsx");toast("✓ تم تصدير الملف")})}
 function showInv(ix){document.getElementById("inv").innerHTML=ix.map(function(i){return invHtml(M[i])}).join("");
 var c=document.getElementById("invc");c.style.display="block";c.scrollIntoView()}
-function cost(c){var r=F,lo=0;for(var i=0;i<T.length&&c>lo;i++){var hi=T[i].u==null?Infinity:T[i].u,q=Math.min(c,hi)-lo;if(q>0)r+=q*T[i].p;lo=hi}return r}
-function totCost(){return M.reduce(function(a,m){return a+cost(Math.max(0,cons(m)))},0)}
+function cost(c,key){var z=key&&Z[key],TT=z?z.T:T,r=z?z.F:F,lo=0;for(var i=0;i<TT.length&&c>lo;i++){var hi=TT[i].u==null?Infinity:TT[i].u,q=Math.min(c,hi)-lo;if(q>0)r+=q*TT[i].p;lo=hi}return r}
+function totCost(){return M.reduce(function(a,m){return a+bill(m)},0)}
 function upd(){if(!DB){try{localStorage.setItem(KEY+"-t",JSON.stringify(T))}catch(e){}}else sw();
 document.getElementById("sC").textContent=fmt(totCost());
-document.querySelectorAll("#tb td[data-c]").forEach(function(td){td.textContent=fmt(cost(Math.max(0,cons(M[+td.dataset.c]))))})}
+document.querySelectorAll("#tb td[data-c]").forEach(function(td){td.textContent=fmt(bill(M[+td.dataset.c]))})}
 function drawT(){var lo=0,h="";
 T.forEach(function(t,i){var L=i===T.length-1;
 h+='<div class="tr"><span data-f="'+i+'">من '+fmt(lo)+'</span>'+(L?'<span>وما فوق</span>':'<span>إلى <input type="number" min="0" step="any" data-u="'+i+'" value="'+t.u+'"></span>')+'<span>السعر (درهم) <input type="number" min="0" step="any" data-p="'+i+'" value="'+t.p+'"></span>'+(T.length>1?'<button class="g" data-x="'+i+'">حذف</button>':'')+'</div>';
@@ -203,7 +262,7 @@ document.getElementById("tiers").onclick=function(e){var i=e.target.dataset.x;if
 document.getElementById("addT").onclick=function(){var n=T.length,pu=n>1?T[n-2].u:0;T[n-1].u=pu+10;T.push({u:null,p:T[n-1].p});drawT();upd()};
 
 
-document.getElementById("tb").oninput=function(e){if(e.target.dataset.i!==undefined)RV[M[+e.target.dataset.i].id]=e.target.value};
+document.getElementById("tb").oninput=function(e){if(e.target.dataset.i!==undefined){var mm=M[+e.target.dataset.i];RV[mm.id]=e.target.value;var w=chk(mm,parseFloat(e.target.value));e.target.style.outline=w?"2px solid #c0392b":"";e.target.title=w}};
 document.getElementById("q").oninput=function(){Q=this.value.trim().toLowerCase();render()};
 document.getElementById("addB").onclick=function(){var d=document.getElementById("rDate").value,n=0;
 document.getElementById("bulk").value.split("\n").forEach(function(l){var p=l.split(/\t|;|،|,/).map(function(x){return x.trim()});
@@ -211,12 +270,19 @@ if(!p[0]&&!p[1])return;addMeter({no:p[0]||"",n:p[1]||p[0],r:[{d:d,v:parseFloat(p
 document.getElementById("bulk").value="";save();render();this.textContent="تمت إضافة "+n+" عداد"};
 document.getElementById("tb").onchange=function(e){var d=e.target.dataset;if(d.nm!==undefined){M[+d.nm].n=e.target.value.trim();wr(M[+d.nm])}else if(d.no!==undefined){M[+d.no].no=e.target.value.trim();wr(M[+d.no])}};
 document.getElementById("allInv").onclick=function(){showInv(M.map(function(m,i){return i}))};
-document.getElementById("rep").onclick=showRep;
+document.getElementById("rep").onclick=showRep;document.getElementById("repY").onclick=showYear;document.getElementById("repA").onclick=showArr;document.getElementById("xl").onclick=expX;
+document.getElementById("cm").value=(document.getElementById("rDate").value||"").slice(0,7);
+document.getElementById("cmb").onclick=function(){var q=document.getElementById("cm").value,b=this;if(!q)return;
+if(!b.dataset.s){b.dataset.s="1";b.textContent="اضغط للتأكيد";setTimeout(function(){b.dataset.s="";b.textContent="إقفال الشهر"},3000);return}
+b.dataset.s="";b.textContent="إقفال الشهر";var miss=M.filter(function(m){return mlist(m).indexOf(q)<0}).length;
+Z[q]={T:JSON.parse(JSON.stringify(T)),F:F};sw();drawZ();render();toast("🔒 تم إقفال "+q+(miss?" (تنبيه: "+miss+" عداد بلا قراءة في هذا الشهر)":""))};
+document.getElementById("zl").onclick=function(e){var q=e.target.dataset.uz;if(q){delete Z[q];sw();drawZ();render();toast("تم إلغاء إقفال "+q)}};document.getElementById("yr").value=(document.getElementById("rDate").value||"").slice(0,4);document.getElementById("saveR2").onclick=document.getElementById("saveR").onclick;document.getElementById("rDate").onchange=render;
 document.getElementById("tb").addEventListener("focusout",function(){if(PEND){PEND=0;setTimeout(render,0)}});
 document.getElementById("prt").onclick=printInv;
 document.getElementById("fee").oninput=function(){F=parseFloat(this.value)||0;try{localStorage.setItem(KEY+"-f",F)}catch(e){}upd()};
-load();M.forEach(function(m,i){if(!m.id)m.id="x"+i});document.getElementById("fee").value=F;drawT();render();
+load();M.forEach(function(m,i){if(!m.id)m.id="x"+i});document.getElementById("fee").value=F;drawT();drawZ();render();
 </script>
+<div id="toast" class="noprint" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a9b5a;color:#fff;padding:10px 18px;border-radius:20px;display:none;z-index:50;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>
 <script src="config.js"></script>
 <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){})</script>
 <script type="module">
