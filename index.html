@@ -200,7 +200,7 @@ var ar=arr(m);if(ar.s>0){tot+=ar.s;rows+='<tr><td colspan="3">متأخرات س�
 return '<div class="inv">'+hdr()+'<h3>فاتورة استهلاك المياه</h3>'
 +'<table><tr><th>اسم المستهلك</th><td>'+esc(m.n)+'</td><th>رقم العداد</th><td>'+esc(m.no||"—")+'</td></tr>'
 +'<tr><th>القراءة السابقة</th><td>'+fmt(pv.v)+' ('+esc(pv.d)+')</td><th>القراءة الحالية</th><td>'+fmt(cur.v)+' ('+esc(cur.d)+')</td></tr>'
-+'<tr><th>الاستهلاك</th><td colspan="3">'+fmt(c)+' م³'+(hasb?' (استُبدل العداد خلال هذه الفترة)':'')+'</td></tr><tr><th>حالة الدفع</th><td colspan="3">'+(isPaid(m)?"✓ مدفوع":"غير مدفوع")+'</td></tr></table>'
++'<tr><th>الاستهلاك</th><td colspan="3">'+fmt(c)+' م³'+(hasb?' (استُبدل العداد خلال هذه الفترة)':'')+'</td></tr><tr>'
 +'<table style="margin-top:10px"><tr><th>الشريحة (م³)</th><th>الكمية (م³)</th><th>السعر (درهم)</th><th>المبلغ (درهم)</th></tr>'+rows
 +'<tr class="tot"><td colspan="3">المجموع المستحق</td><td>'+fmt(tot)+' درهم</td></tr></table></div>'}
 function printInv(){var h=document.getElementById("inv").innerHTML,w=null;
