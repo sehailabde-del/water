@@ -305,5 +305,10 @@ A.onAuthStateChanged(au,u=>{if(!u){if(on)location.reload();$("lg").style.display
 $("lg").style.display="none";if(on)return;on=true;
 startApp(mk(),(C.admins||[]).map(x=>x.toLowerCase()).includes((u.email||"").toLowerCase()))});
 </script>
+ <script>
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
 </body>
 </html>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e7fb5">
